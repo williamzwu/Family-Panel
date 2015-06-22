@@ -1,0 +1,170 @@
+# this is an example of the WUber API
+# as a demonstration of an API spec in YAML
+swagger: '2.0'
+info:
+  title: WUber API
+  description: Query your family API
+  version: "1.0.0"
+# the domain of the service
+host: api.wuber.com
+# array of all schemes that your API supports
+schemes:
+  - https
+# will be prefixed to all paths
+basePath: /v1
+produces:
+  - application/json
+paths:
+  /family:
+    get:
+      summary: Family Tree around this family
+      description: The family endpoint returns information describing the family tree around
+        specified family.
+      parameters:
+        - name: familyname
+          in: query
+          description: The name of the family.
+          required: true
+          type: string
+        - name: generation
+          in: query
+          description: The number of generation below the father of the asked family.
+          required: true
+          type: number
+          format: int
+      tags:
+        - Families
+      responses:
+        200:
+          description: An array of families
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Family'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /relations/ancestors:
+    get:
+      summary: List of ancestors
+      description: The list of ancestors.
+      parameters:
+        - name: person
+          in: query
+          description: the name of the person.
+          required: true
+          type: string
+        - name: generation
+          in: query
+          description: the number of generation of ancestors.
+          required: true
+          type: number
+          format: int
+        - name: bloodrelative
+          in: query
+          description: Type of blood relative, lineal, collateral, adopted or all
+          required: false
+          type: string
+      tags:
+        - Relations
+      responses:
+        200:
+          description: An array of persons who are ancesors of the asked person
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Person'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /relations/descendants:
+    get:
+      summary: List of descendants
+      description: The list of descendants.
+      parameters:
+        - name: person
+          in: query
+          description: the name of the person.
+          required: true
+          type: string
+        - name: generation
+          in: query
+          description: the number of generation of descendants.
+          required: true
+          type: number
+          format: int
+        - name: bloodrelative
+          in: query
+          description: Type of blood relative, lineal, collateral, adopted or all.
+          required: false
+          type: string
+      tags:
+        - Relations
+      responses:
+        200:
+          description: An array of persons who are descendants of the asked person
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Person'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /Iam:
+    get:
+      summary: Direct family members
+      description: The direct family members.
+      parameters:
+        - name: person
+          in: query
+          description: the name of the person.
+          required: true
+          type: string
+      tags:
+        - Myself
+      responses:
+        200:
+          description: An array of persons who are direct family members of the asked person
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Person'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+definitions:
+  Person:
+    properties:
+      familyname:
+        type: string
+        description: The family name (sir name, last name) of the person.
+      given_name:
+        type: string
+        description: The given name (first name) of person.
+      sex:
+        type: string
+        description: The sex of the person.
+      image:
+        type: string
+        description: Image URL representing the person.
+  Family:
+    properties:
+      family_name:
+        type: string
+        description: a name of a family
+      residence:
+        type: string
+        description: The residence of the family.
+  Error:
+    properties:
+      code:
+        type: integer
+        format: int
+      message:
+        type: string
+      fields:
+        type: string
