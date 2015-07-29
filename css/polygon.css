@@ -1,0 +1,8 @@
+.vertex { r:2; fill:black; }
+.center { r:1; fill:red; }
+.startpoint { r:1; fill:blue; }
+.vertexlabel { font-size: 10px; fill: red; stroke-width: 1; text-anchor: middle; }
+.vertexarc { fill:none; stroke:lightgreen; stroke-width: 3 }
+.edgearc { fill:none; stroke:lightblue; }
+.circletest { fill:none; stroke:yellow; }
+.anchor { r:5; fill:white; opacity: 0.05; stroke:blue; }
