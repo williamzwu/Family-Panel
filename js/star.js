@@ -119,7 +119,7 @@ function Vector( c, p )
 //  this.testdraw1();
 }
 
-function Arc( center, radius )
+function Arc( center, radius, color )
 {
   // Note: arc always draws clock-wise.
   // The center of an edge arc is on the outside of the polygon. 
@@ -143,6 +143,7 @@ function Arc( center, radius )
   
   this.center = center;
   this.radius = radius;
+  this.color = color;
   this.SetArcPositionAndOrientation = function ( v1, v2 ) {
     // The arc is specified by two vectors. That's enough to calcualte the orientation
     // However, need to calculate the start and end points by calculating the cross points on the circle with the vector
@@ -166,6 +167,7 @@ function Arc( center, radius )
   this.CreateView = function (parent, cls) {
       this.view = document.createElementNS( svgNS, 'path' );
       this.view.setAttribute( 'class', cls );
+      this.view.setAttribute( 'stroke', this.color );
       parent.appendChild( this.view );
   };
   this.Draw = function () {
@@ -181,9 +183,9 @@ function Arc( center, radius )
 }
 
 // An edge is specified by 2 vectors and is v2 - v1
-function Edge( v1, v2 )
+function Edge( v1, v2, color )
 {
-  Vector.call( this, v1.p, v2.p );
+  Vector.call( this, v1.p, v2.p, color );
   this.v1 = v1;
   this.v2 = v2;
   
@@ -233,8 +235,9 @@ function Edge( v1, v2 )
   this.EdgeReCalc();
 }
 
-function Polygon( pos )
+function Polygon( color, pos )
 { // https://en.wikipedia.org/wiki/Centroid
+  this.color = color;
   var vec = [];
   /*
   for (var i = 0; i < arguments.length; i++) {
@@ -298,7 +301,7 @@ function Polygon( pos )
   // Create center to vertex vectors
   for (var i = 0; i < vec.length; i++) {
      var p = vec[i];
-     var v = new Vector( this.center, p );
+     var v = new Vector( this.center, p, this.color );
      this.order.push(i);
      this.vector.push(v);
   }
@@ -312,7 +315,7 @@ function Polygon( pos )
     for (var i = 0; i < this.order.length; i++) {
       var j = i + 1;
       if( j==this.order.length ) j = 0;
-      var e = new Edge( this.vector[this.order[i]], this.vector[this.order[j]] );
+      var e = new Edge( this.vector[this.order[i]], this.vector[this.order[j]], this.color );
       this.edge.push( e );
     }
   }
@@ -415,7 +418,7 @@ function Polygon( pos )
   this.DrawEdges = function () {
     for( i=0; i < this.edge.length; i++ ) {
       var arc = this.edge[i].arc;
-      var objclass;
+      var objclass = 'edgearc' + this.color;
       /*
       if( this.subject ) {
         var j = i + 1;
@@ -434,7 +437,7 @@ function Polygon( pos )
     for( var i=0; i < this.order.length; i++ ) {
       var arc = this.vector[this.order[i]].arc;
       arc.SetArcOrientation();
-      arc.CreateView( this.parent, 'vertexarc' );
+      arc.CreateView( this.parent, 'vertexarc'+this.color );
       arc.Draw();
       /*
       var v_st = new Vector( e.p, e.arcEnd );
@@ -523,11 +526,15 @@ function Polygon( pos )
 
 var subjects = new Map();
 
-function Subject( name, pos )
+function Subject( name, pos, transform )
 {
   this.person =  persons.get(name);
   this.name = name;
   this.pos = pos;
+  if( transform ) {
+    this.transform = transform;
+    this.pos.Add( this.transform );
+  }
   this.dragging = {
     svgRoot: null,
     on: false,
@@ -662,19 +669,19 @@ function DisplayMembers( treeId )
 
 var stars = new Map();
 
-function StarFamily( treeId )
+function StarFamily( treeId, color )
 {
   this.treeId = treeId;
   var subjectList = [];
   var posList = [];
   var name = ':';
-  for (var i = 1; i < arguments.length; i++) {
+  for (var i = 2; i < arguments.length; i++) {
       var p = subjects.get( arguments[i] );
       subjectList.push( p );
       name += arguments[i]+':';
       posList.push( p.pos );
   }
-  this.polygon = new Polygon( posList );
+  this.polygon = new Polygon( color, posList );
   this.polygon.SetSubjects.apply( this.polygon, subjectList );
   this.Draw = function () { this.polygon.Draw(this.treeId); }
   stars.set( name, this );
@@ -699,7 +706,14 @@ function ReportPositions()
     document.getElementById( "tree" ).style.display = 'none';
     var text = '';
     subjects.forEach(function(s) {
-      var t = "new Subject('"+s.name+"', new Point( "+Math.round(s.pos.X*100)/100+','+Math.round(s.pos.Y*100)/100+' ));\n';
+      var p = new Point( s.pos, 'clone' );
+      if( s.transform )
+          p.Sub( s.transform );
+      var t = "new Subject('"+s.name+"', new Point( "+Math.round(p.X*100)/100+','+Math.round(p.Y*100)/100+' )';
+      if( s.transform ) {
+        t += ", new Point(" + Math.round(s.transform.X*100)/100+','+Math.round(s.transform.Y*100)/100+' )';
+      }
+      t += ');\n';
       text += t;
     }, this);
     document.getElementById( "reporting" ).innerHTML = text;
