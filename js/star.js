@@ -705,6 +705,7 @@ function ReportPositions()
   } else {
     document.getElementById( "tree" ).style.display = 'none';
     var text = '';
+    var transformList = new Map();
     var tn = 1;
     subjects.forEach(function(s) {
       var p = new Point( s.pos, 'clone' );
