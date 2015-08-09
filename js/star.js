@@ -545,7 +545,7 @@ function Subject( name, pos, transform )
   this.Draw = function ( parent ) {
     this.dragging.svgRoot = parent;
     var label = document.createElementNS( svgNS, 'text' );
-    label.setAttribute( "class", "person");
+    label.setAttribute( "class", this.person.sex );
 	  label.setAttribute( "x", this.pos.X );
 	  label.setAttribute( "y", this.pos.Y );
 	  var tn = document.createTextNode(this.person ? this.person.name : '');
@@ -705,13 +705,20 @@ function ReportPositions()
   } else {
     document.getElementById( "tree" ).style.display = 'none';
     var text = '';
+    var tn = 1;
     subjects.forEach(function(s) {
       var p = new Point( s.pos, 'clone' );
       if( s.transform )
           p.Sub( s.transform );
-      var t = "new Subject('"+s.name+"', new Point( "+Math.round(p.X*100)/100+','+Math.round(p.Y*100)/100+' )';
+      var t = "new Subject('"+s.name+"', new Point( "+Math.round(p.X*100)/100+', '+Math.round(p.Y*100)/100+' )';
       if( s.transform ) {
-        t += ", new Point(" + Math.round(s.transform.X*100)/100+','+Math.round(s.transform.Y*100)/100+' )';
+        var varname = transformList.get( s.transform );
+        if( ! varname ) {
+          varname = "shift"+(tn++);
+          text += "var " +varname + " = new Point("+Math.round(s.transform.X*100)/100+', '+Math.round(s.transform.Y*100)/100+' );\n'
+          transformList.set( s.transform, varname );
+        }
+        t += ", " + varname;
       }
       t += ');\n';
       text += t;
