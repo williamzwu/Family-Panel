@@ -1,6 +1,6 @@
 /* http://www.w3schools.com/html/html_colornames.asp */
 .vertex { r:2; fill:black; }
-.center { r:1; fill:red; }
+.center { r:5; fill:red; stroke:red; }
 .startpoint { r:1; fill:blue; }
 .vertexlabel { font-size: 10px; fill: red; stroke-width: 1; text-anchor: middle; }
 .vertexarc1 { fill:none; stroke:lightgreen; stroke-width: 3; opacity: 0.7 }

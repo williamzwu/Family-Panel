@@ -25,10 +25,11 @@ function Distance( a, b ) {
 
 var persons = new Map();
 
-function Person( _name, _sex )
+function Person( _name, _sex, _live )
 {
 	this.name = _name;
 	this.sex = _sex;
+	this.live = _live==null?'':_live
 	persons.set( this.name, this );
 	this.role = new Map();
 	this.AddRole = function ( familyName, role ) { // role: father, mother, 1, 2, 3 for children in order

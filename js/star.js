@@ -38,6 +38,11 @@ function Point( x, y )
   this.RegisterEventListener = function (func, client) {
     this.func.push( { callback: func, client: client } );
   }
+  // Notify the client functions that are registed with the move of this point
+  // Each function is called with registered client and with a notification message as the parameter of the function
+  // If a function call returns false, the whole notification will return false.
+  // The action to the return value is determined by the notifier (the one sends the notification).
+  // Normally, the nofifier may void the move and reset the position to the original position before the move.
   this.Notify = function ( msg ) {
     var allowed = true;
     for (var n = 0; n < this.func.length; n++) {
@@ -107,7 +112,7 @@ function Vector( c, p )
   this.SideSign = function (p) { // Calculate the side value for a point to decide the side of the point 
     return (p.Y-this.center.Y)*this.dx - (p.X-this.center.X)*this.dy;
   }
-  
+  /*
   this.testdraw1 = function () {
     var cc = document.createElementNS( svgNS, 'circle' );
     cc.setAttribute( 'class', 'circletest' );
@@ -116,7 +121,8 @@ function Vector( c, p )
     cc.setAttribute( 'r', this.arcRadius );
     svg.appendChild( cc );
   }
-//  this.testdraw1();
+  */
+  //  this.testdraw1();
 }
 
 function Arc( center, radius, color )
@@ -221,7 +227,7 @@ function Edge( v1, v2, color )
     var side = 0;
     // want to choose the cross point that is on the opposite side of the line v1-v2 with the center point 
     var signC = this.SideSign( cross[side] );
-//    if( this.centerSign > 0 && signC > 0 || this.centerSign < 0 && signC < 0 ) {
+    //    if( this.centerSign > 0 && signC > 0 || this.centerSign < 0 && signC < 0 ) {
     if( signC > 0 ) {
       side = 1;
       signC = this.SideSign( cross[side] );
@@ -246,12 +252,21 @@ function Polygon( color, pos )
       }
   }
   */
+
+  this.mode = 0; // default mode, 0: family layout is fixed, 1: family can be moved around the family head, the first member of the person
+  this.SetAdjMode  = function(mode) {
+    this.mode = mode;
+  }
+
   for (var i = 0; i < pos.length; i++) {
       if( pos[i] instanceof Point ) {
         vec.push( pos[i] );
       }
   }
   
+  // Calculate the center of this Polygon.
+  // if c is passed in as a parameter, it is set to the calculated center and returned
+  // if parameter is passed in as null, a new center point is calculated and returned. ?? Why ? need to revisit later
   this.CalcCenter = function ( c ) {
     var x = 0.0;
     var y = 0.0;
@@ -329,6 +344,7 @@ function Polygon( color, pos )
     }    
   }
   
+  /*  
   this.draw1 = function ( parent ) {
     var redraw = this.pol ? true : false;
     // <polygon points="200,10 250,190 160,210" style="fill:lime;stroke:purple;stroke-width:1" />
@@ -392,15 +408,13 @@ function Polygon( color, pos )
  		this.pol.setAttribute( "style", "fill:none;stroke:purple;stroke-width:1");
     if( ! redraw )
       parent.appendChild( this.pol );
-
-/*    
+    // comment starts
     var cc = document.createElementNS( svgNS, 'circle' );
-    cc.setAttribute( 'class', 'point' );
-    cc.setAttribute( 'cx', this.cx() );
-    cc.setAttribute( 'cy', this.cy() );
+    cc.setAttribute( 'class', 'center' );
+    cc.setAttribute( 'cx', this.center.X );
+    cc.setAttribute( 'cy', this.center.Y );
     svg.appendChild( cc );
-  */  
-
+    // comment ends
     if( redraw ) {
       this.centerView.setAttribute( 'cx', this.center.X );
       this.centerView.setAttribute( 'cy', this.center.Y );
@@ -414,7 +428,8 @@ function Polygon( color, pos )
     }
     
   }
-  
+  */
+
   this.DrawEdges = function () {
     for( i=0; i < this.edge.length; i++ ) {
       var arc = this.edge[i].arc;
@@ -433,7 +448,7 @@ function Polygon( color, pos )
     }
   }
   
-  this.DrawVertices = function (parent) {
+  this.DrawVertices = function () {
     for( var i=0; i < this.order.length; i++ ) {
       var arc = this.vector[this.order[i]].arc;
       arc.SetArcOrientation();
@@ -457,7 +472,85 @@ function Polygon( color, pos )
       */
     }
   } 
+
+  this.dragging = {
+    svgRoot: null,
+    on: false,
+    mouseOffset: null,
+    newpos: new Point( pos.X, pos.Y )
+  };
   
+  this.DrawCenter = function (m) {
+    if( m==1 ) {
+      if( this.cc==null) {
+        this.cc = document.createElementNS( svgNS, 'circle' );
+        this.cc.setAttribute( 'class', 'center' );
+        this.cc.setAttribute( 'cx', this.center.X );
+        this.cc.setAttribute( 'cy', this.center.Y );
+        this.cc.setAttribute( 'r', 20 /*this.arcRadius*/ );
+        this.parent.appendChild(this.cc);
+        var me = this
+        this.cc.addEventListener( "mousedown", (function (evt) {
+              var fixedSubjectDetermined = 0;
+              me.subject.forEach(function(element) {
+                if( element.selected) ++fixedSubjectDetermined;
+              });
+              if( fixedSubjectDetermined > 0 ) {
+                me.dragging.on = true;
+                var p = svg.createSVGPoint();
+                p.x = evt.clientX;
+                p.y = evt.clientY;
+                var m = me.cc.getScreenCTM();
+                p = p.matrixTransform(m.inverse());
+                me.dragging.mouseOffset = new Point( p.x-me.center.X, p.y-me.center.Y );
+              }
+            }));
+        this.cc.addEventListener( "mouseup", (function () {
+            if( ! me.dragging.on ) return;
+                me.dragging.on = false;
+            }));
+        this.cc.addEventListener( "mousemove", (function (evt) {
+            if( ! me.dragging.on ) return;
+                var p = svg.createSVGPoint();
+                p.x = evt.clientX;
+                p.y = evt.clientY;
+                var m = me.cc.getScreenCTM();
+                p = p.matrixTransform(m.inverse());
+                me.dragging.newpos.X = p.x - me.dragging.mouseOffset.X;
+                me.dragging.newpos.Y = p.y - me.dragging.mouseOffset.Y;
+                var oldpos = new Point( me.center.X, me.center.Y );            
+                me.cc.setAttribute("x", me.dragging.newpos.X );
+                me.cc.setAttribute("y", me.dragging.newpos.Y );
+                
+                p.x = p.x
+                // me.pos.X = me.dragging.newpos.X;
+                //me.pos.Y = me.dragging.newpos.Y;
+                /*
+                if( ! me.center.Notify( me ) ) {
+                  me.center.X = oldpos.X;
+                  me.center.Y = oldpos.Y;
+                  me.cc.setAttribute("x", me.center.X );
+                  me.cc.setAttribute("y", me.center.Y );
+                  //me.pos.Notify( me );
+                  me.dragging.on = false;
+                }
+                */
+            }));
+
+
+      }
+    } else {
+      if( this.cc != null) {
+        this.parent.removeChild(this.cc)
+        this.cc = null
+      }
+    }
+  }
+  
+  // Draw this polygon.
+  // 1. Draw all vertices
+  // 2. Draw all edges
+  // 3. Draw the center of this polygon if in the mode of adjusting layout (mode=1)
   this.Draw = function ( g ) {
     this.parent = svg;
     if( g ) {
@@ -474,10 +567,18 @@ function Polygon( color, pos )
     */
     this.DrawVertices();
     this.DrawEdges();
-//    this.draw1( parent );
+    this.DrawCenter( this.mode );
+  //    this.draw1( parent );
   }
 
   // Drawing
+  // Redraw the whole Polygon due to a move of vertex or the layout change (center move)
+  // Before the redrawing, the positions of all vertices are set already.
+  // 1. Recalculate the center of the polygon
+  // 2. Based on the new center, recalculate the vector from the center to each vertex
+  // 3. Based on the new vectors for all vertices, recalculate each edge
+  // 4. Redraw the arcs for each vertex (represented by the vectors)
+  // 5. Redraw the arcs for the eadges
   this.Redraw = function ( s ) {
     /*
     for (var i = 0; i < this.subject.length; i++) {
@@ -487,7 +588,7 @@ function Polygon( color, pos )
     } 
     */   
     this.center = this.CalcCenter( this.center );
-//    this.draw1( parent );
+    //    this.draw1( parent );
     for (var i = 0; i < this.order.length; i++)
       this.vector[this.order[i]].VectorReCalc();
     //this.swapped = false;
@@ -495,11 +596,11 @@ function Polygon( color, pos )
     // order may have changed.
     if( this.AngleOrderChanged() ) {
       // order changed, edges changed. discard all edges and recreate them
-//      alert( "Angle order changed, not allowed." );
+    //      alert( "Angle order changed, not allowed." );
       return false; // This version does not allow order to be changed.
     } else {
       // order has not changed, edges remain, but need to be recalculated.
-//      alert( "Recalc edges" );
+      //      alert( "Recalc edges" );
       for (var i = 0; i < this.edge.length; i++)
         this.edge[i].EdgeReCalc();
       // now redraw vertex arcs
@@ -517,7 +618,9 @@ function Polygon( color, pos )
     return true;
   }
 
-  // Lastly, register event handler to redraw when vertex moves.  
+  // Lastly, register event handler to redraw when a vertex moves.
+  // The redraw is called in responding to only one vertex move when the move of a vertex notifies the listeners.  
+  // Although the redraw is registered to all the vertices, it normally responds to only one vertex move as only one vertex can move at a time.
   for (var i = 0; i < this.order.length; i++) {
     var px = this.vector[this.order[i]].p;
     px.RegisterEventListener( this.Redraw, this );
@@ -531,6 +634,7 @@ function Subject( name, pos, transform )
   this.person =  persons.get(name);
   this.name = name;
   this.pos = pos;
+  this.selected = false;
   if( transform ) {
     this.transform = transform;
     this.pos.Add( this.transform );
@@ -545,7 +649,7 @@ function Subject( name, pos, transform )
   this.Draw = function ( parent ) {
     this.dragging.svgRoot = parent;
     var label = document.createElementNS( svgNS, 'text' );
-    label.setAttribute( "class", this.person.sex );
+    label.setAttribute( "class", this.person.sex+this.person.live );
 	  label.setAttribute( "x", this.pos.X );
 	  label.setAttribute( "y", this.pos.Y );
 	  var tn = document.createTextNode(this.person ? this.person.name : '');
@@ -562,8 +666,8 @@ function Subject( name, pos, transform )
 	  anchor.setAttribute( "y", bb.y );
 	  anchor.setAttribute( "width", bb.width );
 	  anchor.setAttribute( "height", bb.height );
-//	  anchor.setAttribute( "style", "fill:yellow;opacity:0.5" );
-//	  parent.appendChild( anchor );
+    //	  anchor.setAttribute( "style", "fill:yellow;opacity:0.5" );
+    //	  parent.appendChild( anchor );
     /*
     var anchor = document.createElementNS( svgNS, 'circle' );
     anchor.setAttribute( "class", "anchor");
@@ -587,6 +691,14 @@ function Subject( name, pos, transform )
          */
     // http://www.codedread.com/dragtest.svg
     anchor.addEventListener( "mousedown", (function (evt) {
+      if( opmode==1 ) {
+        me.selected = !me.selected
+        if( me.selected ) {
+          me.anchor.setAttribute( "style", "fill:yellow;opacity:0.5" );
+        } else {
+          me.anchor.setAttribute( "style", "" );
+        }
+      } else {
             me.dragging.on = true;
             var p = svg.createSVGPoint();
             p.x = evt.clientX;
@@ -594,7 +706,8 @@ function Subject( name, pos, transform )
             var m = me.anchor.getScreenCTM();
             p = p.matrixTransform(m.inverse());
             me.dragging.mouseOffset = new Point( p.x-me.pos.X, p.y-me.pos.Y );
-         }));
+      }
+      }));
     anchor.addEventListener( "mouseup", (function () {
          if( ! me.dragging.on ) return;
             me.dragging.on = false;
@@ -606,33 +719,38 @@ function Subject( name, pos, transform )
          }));
     anchor.addEventListener( "mousemove", (function (evt) {
         if( ! me.dragging.on ) return;
-            var p = svg.createSVGPoint();
-            p.x = evt.clientX;
-            p.y = evt.clientY;
-            var m = me.anchor.getScreenCTM();
-            p = p.matrixTransform(m.inverse());
-            me.dragging.newpos.X = p.x - me.dragging.mouseOffset.X;
-            me.dragging.newpos.Y = p.y - me.dragging.mouseOffset.Y;
-            me.label.setAttribute("x", me.dragging.newpos.X );
-            me.label.setAttribute("y", me.dragging.newpos.Y );
-            bb = me.label.getBBox();
-            me.anchor.setAttribute("x", bb.x );
-            me.anchor.setAttribute("y", bb.y );
-            
-            var oldpos = new Point( me.pos.X, me.pos.Y );            
-            me.pos.X = me.dragging.newpos.X;
-            me.pos.Y = me.dragging.newpos.Y;
-            if( ! me.pos.Notify( me ) ) {
-              me.pos.X = oldpos.X;
-              me.pos.Y = oldpos.Y;
-              me.label.setAttribute("x", me.pos.X );
-              me.label.setAttribute("y", me.pos.Y );
-              bb = me.label.getBBox();
-              me.anchor.setAttribute("x", bb.x );
-              me.anchor.setAttribute("y", bb.y );
-              me.pos.Notify( me );
-              me.dragging.on = false;
-            }
+        if( evt.which != 1) {
+          // mouse is not in down position anymore
+          me.dragging.on = false;
+          return;
+        }
+        var p = svg.createSVGPoint();
+        p.x = evt.clientX;
+        p.y = evt.clientY;
+        var m = me.anchor.getScreenCTM();
+        p = p.matrixTransform(m.inverse());
+        me.dragging.newpos.X = p.x - me.dragging.mouseOffset.X;
+        me.dragging.newpos.Y = p.y - me.dragging.mouseOffset.Y;
+        me.label.setAttribute("x", me.dragging.newpos.X );
+        me.label.setAttribute("y", me.dragging.newpos.Y );
+        bb = me.label.getBBox();
+        me.anchor.setAttribute("x", bb.x );
+        me.anchor.setAttribute("y", bb.y );
+        
+        var oldpos = new Point( me.pos.X, me.pos.Y );            
+        me.pos.X = me.dragging.newpos.X;
+        me.pos.Y = me.dragging.newpos.Y;
+        if( ! me.pos.Notify( me ) ) {
+          me.pos.X = oldpos.X;
+          me.pos.Y = oldpos.Y;
+          me.label.setAttribute("x", me.pos.X );
+          me.label.setAttribute("y", me.pos.Y );
+          bb = me.label.getBBox();
+          me.anchor.setAttribute("x", bb.x );
+          me.anchor.setAttribute("y", bb.y );
+          me.pos.Notify( me );
+          me.dragging.on = false;
+        }
          }));
     /* This is not supported by SVG 2. It is proposed by SVG 3.
     anchor.addEventListener( "drag", (function (event) {
@@ -671,7 +789,8 @@ var stars = new Map();
 
 function StarFamily( treeId, color )
 {
-  this.treeId = treeId;
+  this.treeId = treeId; // first argument is the 
+  this.mode = 0;
   var subjectList = [];
   var posList = [];
   var name = ':';
@@ -683,13 +802,18 @@ function StarFamily( treeId, color )
   }
   this.polygon = new Polygon( color, posList );
   this.polygon.SetSubjects.apply( this.polygon, subjectList );
+  this.polygon.SetAdjMode(this.mode);
   this.Draw = function () { this.polygon.Draw(this.treeId); }
-  stars.set( name, this );
+  this.SetAdjMode = function(mode) {
+    this.mode = mode;
+    this.polygon.SetAdjMode( mode )
+  }
+  stars.set( name, this )
 }
 
 function DisplayStarFamilies()
 {
-//  var tree = document.getElementById( treeId );
+  //  var tree = document.getElementById( treeId );
   stars.forEach(function(s) {
     s.Draw(); 
   }, this);
@@ -697,7 +821,7 @@ function DisplayStarFamilies()
 
 function ReportPositions()
 {
-//  alert( "Reporting" );
+  //  alert( "Reporting" );
   if( document.getElementById( "tree" ).style.display == 'none') {
     document.getElementById( "tree" ).style.display = '';
     document.getElementById( "reporting" ).style.display = 'none';
@@ -727,5 +851,167 @@ function ReportPositions()
     document.getElementById( "reporting" ).innerHTML = text;
     document.getElementById( "button" ).innerHTML = 'Show Family Tree';
     document.getElementById( "reporting" ).style.display = '';
+  }
+}
+
+function getSelectedNames(n) {
+  /*
+  if( n.checked )
+    alert ("You selected: " + n.value);
+  else
+    alert ("You unselected: " + n.value);
+    */
+}
+
+function ReportSelect()
+{
+  //  alert( "Reporting" );
+  if( document.getElementById( 'button3' ).innerHTML == "Select Families")
+  {
+    var text = '<li>Select the names:</li>\n';
+    stars.forEach(function(f) {
+      text += '<li><INPUT TYPE="checkbox" value="';
+      var n = "";
+      var d = "";
+      for (var i = 0; i < f.polygon.subject.length; i++) {
+        n += d+f.polygon.subject[i].name;
+        d = " ";
+      }
+      text += n + '" onclick="getSelectedNames(this)">'+n+'</input></li>\n';
+    }, this);
+  }
+  document.getElementById( "selecting" ).innerHTML = text;
+  document.getElementById( "selecting" ).style.display = '';
+}
+
+function ReportData()
+{
+  var selFamilies = []; // array that will store the value of selected families, each family is a list of person names delimited by space
+  // gets all the input tags in frm, and their number
+  var frm = document.getElementById( "selecting" )
+  var inpfields = frm.getElementsByTagName( "input" );
+  var nr_inpfields = inpfields.length;
+  // traverse the inpfields elements, and adds the value of selected (checked) checkbox in selchbox
+  for(var i=0; i<nr_inpfields; i++) {
+    if(inpfields[i].type == 'checkbox' && inpfields[i].checked == true) selFamilies.push(inpfields[i].value);
+  }
+
+  var names = new Map();
+  for( var i=0; selFamilies && i<selFamilies.length; i++ )
+  {
+    var ns = selFamilies[i];
+    var nlist = ns.split( " ");
+    for( var k=0; nlist && k<nlist.length; k++ )
+    {
+      if( ! names.get(nlist[k]))
+      {
+        names.set(nlist[k], nlist[k]);
+      }
+    }
+  }
+
+  var text = "";
+  text += "position\n";
+
+  var hasOrigin = origin instanceof Point;
+  if( hasOrigin ) {
+    text = "origin, " + origin.X + "," + origin.Y +"\n";
+  }
+
+  // positions
+  // each person name, x, y, shift
+  // if the name starts with shift, it is a shift position definition
+  // shift3, x, y
+  var transformList = new Map();
+  var tn = 1;
+  subjects.forEach(function(s) {
+    if( ! names.get(s.name) ) return;
+    var pbs = new Point( s.pos, 'clone');
+    if( s.transform ) pbs.Sub( s.transform );
+    var t = s.name+","+persons.get(s.name).sex+","+Math.round(pbs.X*100)/100+', '+Math.round(pbs.Y*100)/100;
+    if( s.transform ) {
+      var varname = transformList.get( s.transform );
+      if( ! varname ) {
+        // first time referenced
+        varname = "shift"+(tn++);
+        transformList.set( s.transform, varname );
+        var so = s.transform;
+        if( hasOrigin ) {
+          so = new Point( s.transform, 'clone' );
+          so.Sub( origin );
+        }
+        text += varname + ","+Math.round(so.X*100)/100+', '+Math.round(so.Y*100)/100 + "\n";
+      }
+      t += ", " + varname;
+    }
+    t += '\n';
+    text += t;
+  }, this);
+
+  // star family
+  text += "family\n";
+  stars.forEach(function(f) {
+    var n = "";
+    var d = "";
+    for (var i = 0; i < f.polygon.subject.length; i++) {
+      n += d+f.polygon.subject[i].name;
+      d = " ";
+    }
+    var selected = false;
+    for( var i=0; ! selected && selFamilies && i<selFamilies.length; i++ )
+    {
+      selected = selected || ( selFamilies[i] == n );
+      
+    }
+    if( ! selected ) return;
+    text += f.treeId+','+f.polygon.color;
+    for (var i = 0; i < f.polygon.subject.length; i++) {
+      text += ','+f.polygon.subject[i].name;
+    }
+    text += '\n';
+  }, this);
+
+  document.getElementById( "reporting" ).innerHTML = text;
+  document.getElementById( "reporting" ).style.display = '';
+}
+
+function Report()
+{
+  if( document.getElementById( 'button3' ).innerHTML == "Select Families")
+  {
+    ReportSelect();
+    document.getElementById( 'button3' ).innerHTML = 'Report Data';
+    document.getElementById( "tree" ).style.display = 'none';
+  }  else if( document.getElementById( 'button3' ).innerHTML == 'Report Data' )
+  {
+    ReportData();
+    document.getElementById( 'button3' ).innerHTML = 'Show Family Tree';
+    document.getElementById( "tree" ).style.display = 'none';
+  } else if( document.getElementById( "tree" ).style.display == 'none') {
+    document.getElementById( "tree" ).style.display = '';
+    document.getElementById( "reporting" ).style.display = 'none';
+    document.getElementById( "selecting" ).style.display = 'none';
+    document.getElementById( 'button3' ).innerHTML = 'Select Families';
+  }
+}
+
+var opmode = 0 // normal
+
+function ToggleFamilyLayoutAdj()
+{
+  if( document.getElementById( 'button2' ).innerHTML == 'Adjust Family Layout') {
+    document.getElementById( 'button2' ).innerHTML = 'Freeze Family Layout';
+    opmode = 1
+    stars.forEach(function(s) {
+      s.SetAdjMode(opmode); 
+      s.Draw()
+    }, this);
+  } else {
+    document.getElementById( 'button2' ).innerHTML = 'Adjust Family Layout';
+    opmode = 0
+    stars.forEach(function(s) {
+      s.SetAdjMode(opmode); 
+      s.Draw()
+    }, this);
   }
 }
